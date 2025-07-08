@@ -1,13 +1,11 @@
-# Build stage - Usamos la imagen más reciente compatible
-FROM maven:3.9-eclipse-temurin-21 AS build
-WORKDIR /app
-COPY pom.xml .
-COPY src ./src
-RUN mvn clean package -DskipTests
+FROM eclipse-temurin:21-jre  
+WORKDIR /app  
 
-# Run stage
-FROM eclipse-temurin:21-jre
-WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
-EXPOSE 4000
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Copia el JAR (ajusta el nombre si es diferente)  
+COPY target/parcial-0.0.1-SNAPSHOT.jar app.jar  
+
+# Expone el puerto definido en application.properties (4000)  
+EXPOSE 4000  
+
+# Inicia la aplicación sin variables de entorno  
+ENTRYPOINT ["java", "-jar", "app.jar"]  
