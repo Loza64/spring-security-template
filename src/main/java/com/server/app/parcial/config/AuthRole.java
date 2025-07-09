@@ -23,88 +23,84 @@ import org.springframework.security.web.header.writers.XXssProtectionHeaderWrite
 @EnableWebSecurity
 public class AuthRole {
 
-    private static final String[] SWAGGER_WHITELIST = {
-        "/v3/api-docs/**",
-        "/swagger-ui/**",
-        "/swagger-ui.html",
-        "/swagger-resources/**",
-        "/webjars/**"
-    };
+        private static final String[] PUBLIC_ENDPOINTS = {
+                        "/api/usuarios/login",
+                        "/api/usuarios/register",
+                        "/api/public/**"
+        };
 
-    private static final String[] PUBLIC_ENDPOINTS = {
-        "/api/usuarios/login",
-        "/api/usuarios/register",
-        "/api/public/**"
-    };
+        private final JwtFilter jwtFilter;
+        private final ObjectMapper objectMapper;
 
-    private final JwtFilter jwtFilter;
-    private final ObjectMapper objectMapper;
+        public AuthRole(@Lazy JwtFilter jwtFilter, ObjectMapper objectMapper) {
+                this.jwtFilter = jwtFilter;
+                this.objectMapper = objectMapper;
+        }
 
-    public AuthRole(@Lazy JwtFilter jwtFilter, ObjectMapper objectMapper) {
-        this.jwtFilter = jwtFilter;
-        this.objectMapper = objectMapper;
-    }
+        private String errorResponse(HttpStatus status, String message) throws JsonProcessingException {
+                return objectMapper.writeValueAsString(Response.build(status.value(), message, null));
+        }
 
-    private String errorResponse(HttpStatus status, String message) throws JsonProcessingException {
-        return objectMapper.writeValueAsString(Response.build(status.value(), message, null));
-    }
+        @Bean
+        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+                return http
+                                // Configuración de cabeceras de seguridad
+                                .headers(headers -> headers
+                                                .contentSecurityPolicy(csp -> csp
+                                                                .policyDirectives(
+                                                                                "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;"))
+                                                .httpStrictTransportSecurity(hsts -> hsts
+                                                                .maxAgeInSeconds(31536000)
+                                                                .includeSubDomains(true)
+                                                                .preload(true))
+                                                .xssProtection(xss -> xss
+                                                                .headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
+                                                .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
+                                                .contentTypeOptions(Customizer.withDefaults()))
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http
-            // Configuración de cabeceras de seguridad
-            .headers(headers -> headers
-                .contentSecurityPolicy(csp -> csp
-                    .policyDirectives("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;"))
-                .httpStrictTransportSecurity(hsts -> hsts
-                    .maxAgeInSeconds(31536000)
-                    .includeSubDomains(true)
-                    .preload(true))
-                .xssProtection(xss -> xss
-                    .headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
-                .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
-                .contentTypeOptions(Customizer.withDefaults()))
-            
-            // Configuración básica de seguridad
-            .cors(Customizer.withDefaults())
-            .csrf(AbstractHttpConfigurer::disable)
-            .httpBasic(AbstractHttpConfigurer::disable)
-            .formLogin(AbstractHttpConfigurer::disable)
-            .logout(AbstractHttpConfigurer::disable)
-            .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            
-            // Filtro JWT
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-            
-            // Autorización de endpoints
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.OPTIONS).permitAll() // Permitir preflight requests
-                .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-                .requestMatchers(SWAGGER_WHITELIST).permitAll()
-                
-                // Ejemplo de configuración de roles (descomentar y ajustar según necesidades)
-                // .requestMatchers(HttpMethod.GET, "/api/actividades/**")
-                //     .hasAnyAuthority("ENCARGADO", "INSTRUCTOR_NORMAL", "INSTRUCTOR_REMUNERADO")
-                // .requestMatchers("/api/actividades/**")
-                //     .hasAuthority("ENCARGADO")
-                
-                .anyRequest().authenticated())
-            
-            // Manejo de excepciones
-            .exceptionHandling(exceptions -> exceptions
-                .accessDeniedHandler((req, res, ex) -> {
-                    res.setStatus(HttpStatus.FORBIDDEN.value());
-                    res.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                    res.getWriter().write(errorResponse(HttpStatus.FORBIDDEN,
-                        "Acceso denegado: No tienes los permisos necesarios para este recurso"));
-                })
-                .authenticationEntryPoint((req, res, ex) -> {
-                    res.setStatus(HttpStatus.UNAUTHORIZED.value());
-                    res.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                    res.getWriter().write(errorResponse(HttpStatus.UNAUTHORIZED,
-                        "Autenticación requerida: Por favor inicie sesión con credenciales válidas"));
-                }))
-            .build();
-    }
+                                // Configuración básica de seguridad
+                                .cors(Customizer.withDefaults())
+                                .csrf(AbstractHttpConfigurer::disable)
+                                .httpBasic(AbstractHttpConfigurer::disable)
+                                .formLogin(AbstractHttpConfigurer::disable)
+                                .logout(AbstractHttpConfigurer::disable)
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                                // Filtro JWT
+                                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+
+                                // Autorización de endpoints
+                                .authorizeHttpRequests(
+                                                auth -> auth
+                                                                .requestMatchers(HttpMethod.OPTIONS).permitAll() // Permitir
+                                                                                                                 // preflight
+                                                                                                                 // requests
+                                                                .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+
+                                                                .requestMatchers("/api/usuarios/list").hasRole("TECH")
+                                                                .requestMatchers("/api/tickets/created")
+                                                                .hasAnyRole("TECH", "USER")
+                                                                .requestMatchers("/api/tickets/list").hasRole("TECH")
+                                                                .requestMatchers("/api/tickets/state/update")
+                                                                .hasRole("TECH")
+
+                                )
+
+                                // Manejo de excepciones
+                                .exceptionHandling(exceptions -> exceptions
+                                                .accessDeniedHandler((req, res, ex) -> {
+                                                        res.setStatus(HttpStatus.FORBIDDEN.value());
+                                                        res.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                                                        res.getWriter().write(errorResponse(HttpStatus.FORBIDDEN,
+                                                                        "Acceso denegado: No tienes los permisos necesarios para este recurso"));
+                                                })
+                                                .authenticationEntryPoint((req, res, ex) -> {
+                                                        res.setStatus(HttpStatus.UNAUTHORIZED.value());
+                                                        res.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                                                        res.getWriter().write(errorResponse(HttpStatus.UNAUTHORIZED,
+                                                                        "Autenticación requerida: Por favor inicie sesión con credenciales válidas"));
+                                                }))
+                                .build();
+        }
 }

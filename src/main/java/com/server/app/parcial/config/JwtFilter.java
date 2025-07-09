@@ -36,9 +36,9 @@ public class JwtFilter extends OncePerRequestFilter {
     private final ObjectMapper objectMapper;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(@SuppressWarnings("null") HttpServletRequest request,
+            @SuppressWarnings("null") HttpServletResponse response,
+            @SuppressWarnings("null") FilterChain filterChain) throws ServletException, IOException {
         try {
             String token = extractToken(request);
 
@@ -53,24 +53,27 @@ public class JwtFilter extends OncePerRequestFilter {
             }
 
             int idUser = jwtConfig.extracClaims(token).get("id", Integer.class);
+            System.out.println("Token: " + token);
             Usuario usuario = usuarioService.findById(idUser);
-
+            System.out.println(usuario);
             UserDetails userDetails = User.builder()
                     .username(usuario.getUsername())
-                    .password("")
+                    .password(usuario.getPassword())
                     .roles(String.valueOf(usuario.getRol().getName()))
                     .build();
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities());
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                    userDetails,
+                    null,
+                    userDetails.getAuthorities());
 
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
             filterChain.doFilter(request, response);
+
+            System.out.println("Rol desde BD: " + usuario.getRol().getName());
+            System.out.println("Authorities construidas: " + userDetails.getAuthorities());
 
         } catch (Exception e) {
             logger.error("JWT Error → {}", e.getMessage());
@@ -94,13 +97,11 @@ public class JwtFilter extends OncePerRequestFilter {
                         "status", status.value(),
                         "error", status.getReasonPhrase(),
                         "message", message,
-                        "timestamp", Instant.now().toString()
-                )
-        ));
+                        "timestamp", Instant.now().toString())));
     }
 
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+    protected boolean shouldNotFilter(@SuppressWarnings("null") HttpServletRequest request) throws ServletException {
         String path = request.getRequestURI();
         return path.startsWith("/api/auth");
     }

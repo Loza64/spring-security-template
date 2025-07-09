@@ -68,9 +68,18 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.findAll());
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Usuario> getUsuarioById(@PathVariable int id) {
-        return ResponseEntity.ok(usuarioService.findById(id));
+    @GetMapping("/data/{id}")
+    public ResponseEntity<?> getUsuarioById(@PathVariable("id") int id) {
+        Usuario data = usuarioService.findById(id);
+        return Response.build(HttpStatus.OK.value(), "User info ", data);
     }
+
+
+      @GetMapping("/list")
+    public ResponseEntity<?> getUsuariosList() {
+        List<Usuario> data = usuarioService.findAll();
+        return Response.build(HttpStatus.OK.value(), "User list ", data);
+    }
+
 
 }
